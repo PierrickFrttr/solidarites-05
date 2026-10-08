@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solidarités 05</title>
+<style>
+:root{--fond:#f7f5f0;--carte:#fff;--texte:#1d2a33;--doux:#5a6670;--trait:#d8d3c8;--accent:#0b5c7a;--alerte:#b3261e;--gris:#a7adb2}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--fond);color:var(--texte)}
+a{color:var(--accent)}
+button,select,input{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid #f2a900;outline-offset:2px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;background:var(--carte);border-bottom:1px solid var(--trait)}
+header h1{font-size:1.1rem;margin:0;flex:1 1 auto}
+.modes button{border:2px solid var(--accent);background:none;color:var(--accent);padding:6px 12px;border-radius:20px;font-weight:600}
+.modes button[aria-pressed=true]{background:var(--accent);color:#fff}
+.urgences{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 16px;background:var(--alerte);color:#fff;font-size:.95rem;position:sticky;top:0;z-index:5}
+.urgences a{color:#fff;font-weight:700}
+main{padding:16px;max-width:1400px;margin:auto}
+[hidden]{display:none!important}
+/* Grand public */
+.besoins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.besoins button{background:var(--carte);border:2px solid var(--trait);border-radius:14px;padding:16px 8px;font-size:1.05rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px}
+.besoins button span{font-size:2.4rem}
+.besoins button:hover{border-color:var(--accent)}
+.question{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:12px 0}
+.question label{display:flex;flex-direction:column;font-weight:600;gap:4px}
+.question select,.question button{padding:8px;border:1px solid var(--doux);border-radius:8px;background:var(--carte)}
+.resultats{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.fichec{background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.fichec h3{margin:0 0 4px;font-size:1.05rem}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.actions a{background:var(--accent);color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600}
+.actions a.sec{background:none;color:var(--accent);border:1px solid var(--accent)}
+.badge{display:inline-block;font-size:.8rem;padding:1px 8px;border-radius:10px;background:#eee;margin:2px 4px 2px 0}
+.badge.vieux{background:#fde7c4;color:#7a4b00}
+.retour{background:none;border:none;color:var(--accent);font-weight:600;padding:4px 0}
+/* Pro */
+.outils{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:10px}
+.outils label{display:flex;flex-direction:column;font-size:.8rem;color:var(--doux)}
+.outils select,.outils input{padding:6px;border:1px solid var(--trait);border-radius:6px;background:var(--carte);color:var(--texte);min-width:120px}
+.outils button{padding:7px 12px;border:1px solid var(--accent);background:var(--carte);color:var(--accent);border-radius:6px}
+.outils button[aria-pressed=true]{background:var(--accent);color:#fff}
+.zone{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px}
+#graphe{width:100%;height:72vh;background:var(--carte);border:1px solid var(--trait);border-radius:10px;display:block}
+#panneau{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:12px 14px;height:72vh;overflow:auto}
+#panneau h2{margin:0 0 4px;font-size:1.15rem}
+#panneau h3{font-size:.95rem;margin:14px 0 4px;color:var(--doux);text-transform:uppercase;letter-spacing:.03em}
+.service{border-left:3px solid var(--trait);padding-left:8px;margin:8px 0}
+.lienfiche{background:none;border:none;padding:0;color:var(--accent);text-decoration:underline;text-align:left}
+.legende{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.85rem;margin-top:8px}
+.legende i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.noeud{cursor:pointer}
+.noeud.halo circle{stroke:#f2a900;stroke-width:4;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{stroke-width:9;stroke-opacity:.4}}
+.estompe{opacity:.12}
+#bulle{position:fixed;pointer-events:none;background:#1d2a33;color:#fff;padding:4px 8px;border-radius:6px;font-size:.85rem;z-index:9}
+table{width:100%;border-collapse:collapse;background:var(--carte);font-size:.9rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--trait);vertical-align:top}
+.info{font-size:.9rem;color:var(--doux)}
+@media (max-width:800px){.resultats,.zone{grid-template-columns:1fr}#panneau{height:auto}#graphe{height:60vh}.constellation{order:-1}}
+</style>
+</head>
+<body>
+<div class="urgences" role="region" aria-label="Numéros d'urgence">
+  <strong>Urgence :</strong>
+  <span><a href="tel:115">115</a> dormir ce soir</span>
+  <span><a href="tel:3919">3919</a> violences femmes</span>
+  <span><a href="tel:119">119</a> enfant en danger</span>
+  <span><a href="tel:15">15</a> urgence médicale</span>
+</div>
+<header>
+  <h1>Solidarités Hautes-Alpes — qui fait quoi ?</h1>
+  <div class="modes">
+    <button id="bt-public" aria-pressed="true">J'ai besoin d'aide</button>
+    <button id="bt-pro" aria-pressed="false">Professionnel</button>
+  </div>
+</header>
+
+<main>
+  <!-- Grand public -->
+  <section id="public">
+    <div id="etape-besoin">
+      <h2>De quoi avez-vous besoin ?</h2>
+      <div class="besoins" id="grille"></div>
+    </div>
+    <div id="etape-liste" hidden>
+      <button class="retour" id="retour">← Choisir un autre besoin</button>
+      <h2 id="titre-liste"></h2>
+      <div class="question">
+        <label>Où êtes-vous ? <select id="commune"><option value="">Je ne sais pas</option></select></label>
+        <button id="localiser">📍 Me localiser</button>
+        <label>Pour qui ? <select id="pourqui">
+          <option value="">Pour moi</option><option value="jeunes">Un jeune</option><option value="seniors">Une personne âgée</option>
+          <option value="familles">Une famille</option><option value="personnes-en-situation-de-handicap">Une personne handicapée</option>
+          <option value="personnes-exilees">Une personne exilée</option></select></label>
+      </div>
+      <div class="resultats">
+        <div id="liste" aria-live="polite"></div>
+        <svg class="constellation" id="constellation" viewBox="0 0 320 320" role="img" aria-label="Le besoin au centre, les lieux autour"></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- Professionnel -->
+  <section id="pro" hidden>
+    <div class="outils">
+      <label>Recherche <input id="recherche" type="search" placeholder="Nom, dispositif, mot-clé"></label>
+      <label>Besoin <select id="f-besoin"></select></label>
+      <label>Public <select id="f-public"></select></label>
+      <label>Territoire <select id="f-bassin"></select></label>
+      <label>Type <select id="f-type"></select></label>
+      <label>Liens <select id="f-lien"><option value="">Tous</option><option value="part">Partenariats</option><option value="theme">Thématiques</option></select></label>
+      <label>Couleur <select id="f-couleur"><option value="type">Type de structure</option><option value="besoin">Besoin principal</option></select></label>
+      <label>Taille <select id="f-taille"><option value="services">Nb de services</option><option value="part">Nb de partenariats</option></select></label>
+      <button id="bt-chemin" aria-pressed="false">Mode chemin</button>
+      <button id="bt-vue" aria-pressed="false">Vue liste</button>
+      <button id="bt-reset">Réinitialiser</button>
+    </div>
+    <p class="info" id="compte" aria-live="polite"></p>
+    <div class="zone">
+      <div>
+        <svg id="graphe" aria-label="Nuage des structures. La même information est disponible en vue liste."></svg>
+        <div id="vue-liste" hidden></div>
+        <div class="legende" id="legende"></div>
+      </div>
+      <aside id="panneau" aria-live="polite"><p class="info">Cliquez sur un point pour ouvrir la fiche de la structure.<br><br>
+        Trait fin gris : lien thématique (même besoin, même public, même bassin), visible quand un besoin est choisi.<br>
+        Trait épais avec flèche : partenariat déclaré et validé.<br>Point gris : fiche non mise à jour depuis plus de 12 mois.</p></aside>
+    </div>
+  </section>
+</main>
+<div id="bulle" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="data.js"></script>
+<script>
+const CONTACT_ANIMATEUR = "animation-reseau@exemple.fr"; // à remplacer par l'adresse de l'animateur du réseau
+const S = DATA.structures, parId = new Map(S.map(s => [s.id, s]));
+const BESOINS = {
+  logement: ["🏠", "Me loger"], alimentation: ["🍞", "Manger, m'équiper"], sante: ["🩺", "Me soigner"],
+  emploi: ["💼", "Trouver un travail"], argent: ["💶", "Gérer mon argent"], droits: ["📄", "Mes papiers, mes droits"],
+  famille: ["👨‍👩‍👧", "Ma famille, mes enfants"], handicap: ["♿", "Handicap"], mobilite: ["🚗", "Me déplacer"],
+  numerique: ["💻", "Internet, ordinateur"], francais: ["🗣️", "Lire, écrire, parler français"], violences: ["🛑", "Violences"],
+};
+const TYPES = {
+  "mediation-numerique": "Lieu de médiation numérique", "ma-boussole-aidants": "Aide aux aidants",
+  "emplois-de-linclusion": "Insertion par l'activité économique", dora: "Service d'insertion (DORA)",
+  monenfant: "Accueil petite enfance", finess: "Établissement sanitaire et social", "carif-oref": "Organisme de formation",
+  "france-travail": "France Travail", "mes-aides": "Aides mobilité", "action-logement": "Action Logement",
+};
+const PUBLICS = {
+  "tous-publics": "Tout public", "demandeurs-emploi": "Demandeurs d'emploi", actifs: "Actifs", familles: "Familles",
+  "personnes-en-situation-de-handicap": "Personnes handicapées", "personnes-exilees": "Personnes exilées",
+  "beneficiaires-des-minimas-sociaux": "Bénéficiaires des minima sociaux", seniors: "Seniors", jeunes: "Jeunes",
+  etudiants: "Étudiants", "personnes-en-situation-durgence": "Personnes en situation d'urgence", femmes: "Femmes",
+};
+const FRAIS = { gratuit: "Gratuit", payant: "Payant", "gratuit-sous-conditions": "Gratuit sous conditions", "adhesion": "Adhésion" };
+
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const lib = (dico, k) => dico[k] || String(k).replace(/-/g, " ");
+const type = s => s.sources[0];
+const limite = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+const vieux = s => s.maj < limite;
+const telAff = t => t.replace(/^\+33/, "0").replace(/(\d{2})(?=\d)/g, "$1 ");
+const dateFr = d => d.split("-").reverse().join("/");
+const dist = (a, b) => { // km, formule de haversine
+  const r = Math.PI / 180, x = Math.sin((b.lat - a.lat) * r / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin((b.lon - a.lon) * r / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(x));
+};
+const principal = s => {
+  const n = {}; s.services.forEach(sv => sv.besoins.forEach(b => n[b] = (n[b] || 0) + 1));
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0] || "";
+};
+S.forEach(s => s.principal = principal(s));
+const pubOk = (a, b) => !a.publics.length || !b.publics.length || a.publics.includes("tous-publics") || b.publics.includes("tous-publics") || a.publics.some(p => b.publics.includes(p));
+// ponytail: liens thématiques en O(n²) côté navigateur, à précalculer côté serveur au-delà de ~1000 structures
+function thematiques(noeuds, besoin) {
+  const L = [];
+  for (let i = 0; i < noeuds.length; i++) for (let j = i + 1; j < noeuds.length; j++) {
+    const a = noeuds[i], b = noeuds[j];
+    if (a.bassin !== b.bassin || !pubOk(a, b)) continue;
+    if (besoin ? a.besoins.includes(besoin) && b.besoins.includes(besoin) : a.besoins.some(x => b.besoins.includes(x)))
+      L.push({ source: a, target: b, kind: "theme" });
+  }
+  return L;
+}
+const PART = DATA.partenariats.map(p => ({ source: parId.get(p.de), target: parId.get(p.vers), kind: "part", besoin: p.besoin }));
+const nbPart = s => PART.filter(l => l.source === s || l.target === s).length;
+
+/* ---------- Modes ---------- */
+const btPublic = document.getElementById("bt-public"), btPro = document.getElementById("bt-pro");
+function mode(pro) {
+  btPublic.setAttribute("aria-pressed", !pro); btPro.setAttribute("aria-pressed", pro);
+  document.getElementById("public").hidden = pro; document.getElementById("pro").hidden = !pro;
+  if (pro) dessiner();
+}
+btPublic.onclick = () => mode(false); btPro.onclick = () => mode(true);
+
+/* ---------- Grand public ---------- */
+let besoinChoisi = null, position = null;
+const grille = document.getElementById("grille");
+grille.innerHTML = Object.entries(BESOINS).map(([k, [ic, t]]) => `<button data-b="${k}"><span aria-hidden="true">${ic}</span>${t}</button>`).join("");
+grille.onclick = e => { const b = e.target.closest("button"); if (b) { besoinChoisi = b.dataset.b; afficherListe(); } };
+document.getElementById("retour").onclick = () => { document.getElementById("etape-liste").hidden = true; document.getElementById("etape-besoin").hidden = false; };
+
+const communes = d3.rollups(S.filter(s => s.lat), v => ({ lat: d3.mean(v, s => s.lat), lon: d3.mean(v, s => s.lon) }), s => s.commune).sort((a, b) => a[0].localeCompare(b[0]));
+const selCommune = document.getElementById("commune");
+communes.forEach(([c]) => selCommune.add(new Option(c, c)));
+selCommune.onchange = () => { position = selCommune.value ? new Map(communes).get(selCommune.value) : null; afficherListe(); };
+document.getElementById("pourqui").onchange = afficherListe;
+document.getElementById("localiser").onclick = () => navigator.geolocation?.getCurrentPosition(
+  p => { position = { lat: p.coords.latitude, lon: p.coords.longitude }; selCommune.value = ""; afficherListe(); },
+  () => alert("Position non disponible. Choisissez votre commune dans la liste."));
+
+function afficherListe() {
+  document.getElementById("etape-besoin").hidden = true; document.getElementById("etape-liste").hidden = false;
+  const [ic, titre] = BESOINS[besoinChoisi], pq = document.getElementById("pourqui").value;
+  document.getElementById("titre-liste").textContent = `${ic} ${titre}`;
+  let r = S.filter(s => s.besoins.includes(besoinChoisi) && (!pq || !s.publics.length || s.publics.includes(pq) || s.publics.includes("tous-publics")));
+  r.forEach(s => s.km = position && s.lat ? dist(position, s) : null);
+  r.sort((a, b) => (!!b.tel - !!a.tel) || ((a.km ?? 1e9) - (b.km ?? 1e9)) || a.nom.localeCompare(b.nom));
+  r = r.slice(0, 8);
+  const liste = document.getElementById("liste");
+  if (!r.length) {
+    liste.innerHTML = `<div class="fichec"><h3>Nous n'avons pas encore de lieu pour ce besoin.</h3>
+      <p>Appelez le <a href="tel:3919">3919</a> (violences), le <a href="tel:115">115</a> (dormir ce soir),
+      ou le <a href="tel:3939">3939</a> (Allô Service Public) : on vous dira où aller.</p></div>`;
+  } else {
+    liste.innerHTML = r.map((s, i) => `<div class="fichec" id="r${i}">
+      <h3>${i + 1}. ${esc(s.nom)}</h3>
+      <div>${esc(s.commune)}${s.km != null ? ` — à ${Math.round(s.km)} km` : ""} ${vieux(s) ? '<span class="badge vieux">infos à vérifier</span>' : ""}</div>
+      ${s.horaires ? `<div class="info">Horaires : ${esc(s.horaires)}</div>` : ""}
+      <div class="actions">
+        ${s.tel ? `<a href="tel:${esc(s.tel)}">📞 Appeler ${esc(telAff(s.tel))}</a>` : ""}
+        ${s.lat ? `<a class="sec" href="https://www.openstreetmap.org/directions?route=%3B${s.lat}%2C${s.lon}" target="_blank" rel="noopener">🗺️ Y aller</a>` : ""}
+        ${s.mail ? `<a class="sec" href="mailto:${esc(s.mail)}">✉️ Écrire</a>` : ""}
+      </div></div>`).join("");
+  }
+  // Constellation : le besoin au centre, les lieux autour
+  const svg = d3.select("#constellation").html(""), c = 160, R = 115;
+  r.forEach((s, i) => {
+    const a = i / r.length * 2 * Math.PI - Math.PI / 2, x = c + R * Math.cos(a), y = c + R * Math.sin(a);
+    svg.append("line").attr("x1", c).attr("y1", c).attr("x2", x).attr("y2", y).attr("stroke", "#c9c2b4").attr("stroke-width", 2);
+    const g = svg.append("a").attr("href", `#r${i}`);
+    g.append("circle").attr("cx", x).attr("cy", y).attr("r", 18).attr("fill", vieux(s) ? "#a7adb2" : "#0b5c7a");
+    g.append("text").attr("x", x).attr("y", y + 5).attr("text-anchor", "middle").attr("fill", "#fff").attr("font-weight", 700).text(i + 1);
+    g.append("title").text(s.nom);
+  });
+  svg.append("circle").attr("cx", c).attr("cy", c).attr("r", 38).attr("fill", "#f7f5f0").attr("stroke", "#0b5c7a").attr("stroke-width", 3);
+  svg.append("text").attr("x", c).attr("y", c + 13).attr("text-anchor", "middle").attr("font-size", 36).text(ic);
+}
+
+/* ---------- Professionnel ---------- */
+const $ = id => document.getElementById(id);
+const remplir = (id, tout, vals, dico) => { const el = $(id); el.add(new Option(tout, "")); vals.forEach(v => el.add(new Option(dico ? lib(dico, v) : v, v))); };
+remplir("f-besoin", "Tous", Object.keys(BESOINS), Object.fromEntries(Object.entries(BESOINS).map(([k, v]) => [k, v[1]])));
+remplir("f-public", "Tous", [...new Set(S.flatMap(s => s.publics))].sort(), PUBLICS);
+remplir("f-bassin", "Tout le 05", [...new Set(S.map(s => s.bassin))].sort());
+remplir("f-type", "Tous", [...new Set(S.map(type))], TYPES);
+
+const svg = d3.select("#graphe"), racine = svg.append("g");
+svg.append("defs").append("marker").attr("id", "fleche").attr("viewBox", "0 -5 10 10").attr("refX", 10).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")
+  .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#c2410c");
+const zoom = d3.zoom().scaleExtent([.3, 6]).on("zoom", e => racine.attr("transform", e.transform));
+svg.call(zoom);
+const gBassins = racine.append("g"), gLiens = racine.append("g"), gChemin = racine.append("g"), gNoeuds = racine.append("g");
+const couleurType = d3.scaleOrdinal(Object.keys(TYPES), d3.schemeTableau10);
+const couleurBesoin = d3.scaleOrdinal(Object.keys(BESOINS), d3.schemePaired);
+const couleur = s => vieux(s) ? "#a7adb2" : $("f-couleur").value === "type" ? couleurType(type(s)) : (s.principal ? couleurBesoin(s.principal) : "#555");
+const rayon = s => 5 + 2.2 * Math.sqrt($("f-taille").value === "services" ? s.services.length : nbPart(s));
+const sim = d3.forceSimulation().force("charge", d3.forceManyBody().strength(-25)).force("collide", d3.forceCollide(s => rayon(s) + 2))
+  .on("tick", () => {
+    gNoeuds.selectAll(".noeud").attr("transform", s => `translate(${s.x},${s.y})`);
+    gLiens.selectAll("line").each(function (l) { bout(d3.select(this), l); });
+    gChemin.selectAll("line").each(function (l) { bout(d3.select(this), l); });
+  });
+function bout(sel, l) { // raccourcit le trait pour que la flèche touche le bord du point
+  const dx = l.target.x - l.source.x, dy = l.target.y - l.source.y, d = Math.hypot(dx, dy) || 1, r = l.kind === "part" ? rayon(l.target) + 2 : 0;
+  sel.attr("x1", l.source.x).attr("y1", l.source.y).attr("x2", l.target.x - dx / d * r).attr("y2", l.target.y - dy / d * r);
+}
+
+let selection = null, chemin = [], modeChemin = false, visibles = [], liens = [];
+function filtrees() {
+  const b = $("f-besoin").value, p = $("f-public").value, ba = $("f-bassin").value, t = $("f-type").value;
+  return S.filter(s => (!b || s.besoins.includes(b)) && (!p || s.publics.includes(p)) && (!ba || s.bassin === ba) && (!t || type(s) === t));
+}
+const correspond = (s, q) => q && (s.nom + " " + s.description + " " + s.services.map(v => v.nom + " " + v.description).join(" ")).toLowerCase().includes(q);
+
+function dessiner() {
+  const W = $("graphe").clientWidth || 800, H = $("graphe").clientHeight || 600;
+  visibles = filtrees();
+  const ids = new Set(visibles), fl = $("f-lien").value, b = $("f-besoin").value;
+  liens = [
+    ...(fl !== "theme" ? PART.filter(l => ids.has(l.source) && ids.has(l.target)) : []),
+    ...(fl !== "part" && b ? thematiques(visibles, b) : []),
+  ];
+  // Ancre géographique : chaque bassin attire ses structures, à sa place approximative sur la carte du 05
+  const proj = (lat, lon) => [40 + (lon - 5.55) / 1.6 * (W - 80), 40 + (45.1 - lat) / .95 * (H - 80)];
+  const ancres = new Map(d3.rollups(S.filter(s => s.lat), v => proj(d3.mean(v, s => s.lat), d3.mean(v, s => s.lon)), s => s.bassin));
+  ancres.set("Non localisé", [W - 60, H - 40]);
+  gBassins.selectAll("text").data([...ancres], d => d[0]).join("text").attr("x", d => d[1][0]).attr("y", d => d[1][1] - 50)
+    .attr("text-anchor", "middle").attr("fill", "#b5ad9d").attr("font-size", 15).attr("font-weight", 700).text(d => d[0]);
+
+  gLiens.selectAll("line").data(liens).join("line")
+    .attr("stroke", l => l.kind === "part" ? "#c2410c" : "#9aa5ad").attr("stroke-opacity", l => l.kind === "part" ? .9 : .25)
+    .attr("stroke-width", l => l.kind === "part" ? 3 : 1).attr("marker-end", l => l.kind === "part" ? "url(#fleche)" : null);
+
+  const q = $("recherche").value.trim().toLowerCase();
+  gNoeuds.selectAll(".noeud").data(visibles, s => s.id).join(entree => {
+    const g = entree.append("g").attr("class", "noeud").attr("tabindex", 0).attr("role", "button");
+    g.append("circle").attr("stroke", "#fff").attr("stroke-width", 1.5);
+    g.on("mouseenter", (e, s) => survol(s, e)).on("mousemove", e => bulle(e)).on("mouseleave", () => survol(null))
+      .on("click", (e, s) => clic(s)).on("keydown", (e, s) => { if (e.key === "Enter") clic(s); })
+      .call(d3.drag().on("start", (e, s) => { if (!e.active) sim.alphaTarget(.2).restart(); s.fx = s.x; s.fy = s.y; })
+        .on("drag", (e, s) => { s.fx = e.x; s.fy = e.y; }).on("end", (e, s) => { if (!e.active) sim.alphaTarget(0); s.fx = s.fy = null; }));
+    return g;
+  }).attr("aria-label", s => s.nom).classed("halo", s => correspond(s, q))
+    .select("circle").attr("r", rayon).attr("fill", couleur);
+
+  visibles.forEach(s => { if (s.x == null) { const a = ancres.get(s.bassin); s.x = a[0] + Math.random() * 40 - 20; s.y = a[1] + Math.random() * 40 - 20; } });
+  sim.nodes(visibles)
+    .force("x", d3.forceX(s => ancres.get(s.bassin)[0]).strength(.12)).force("y", d3.forceY(s => ancres.get(s.bassin)[1]).strength(.12))
+    .force("lien", d3.forceLink(liens).strength(l => l.kind === "part" ? .3 : .01))
+    .force("collide", d3.forceCollide(s => rayon(s) + 2)).alpha(.8).restart();
+
+  const nbHalo = q ? visibles.filter(s => correspond(s, q)).length : 0;
+  $("compte").textContent = `${visibles.length} structures, ${liens.filter(l => l.kind === "part").length} partenariats, ${liens.filter(l => l.kind === "theme").length} liens thématiques`
+    + (q ? ` — ${nbHalo} correspondent à « ${q} »` : "") + (b ? "" : ". Choisissez un besoin pour voir les liens thématiques.");
+  legende(); tableau(q); cheminDessin();
+}
+
+function legende() {
+  const parType = $("f-couleur").value === "type";
+  const entrees = parType ? Object.keys(TYPES).filter(t => S.some(s => type(s) === t)).map(t => [couleurType(t), TYPES[t]])
+    : Object.entries(BESOINS).map(([k, v]) => [couleurBesoin(k), v[1]]);
+  $("legende").innerHTML = entrees.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join("")
+    + `<span><i style="background:#a7adb2"></i>Fiche à vérifier (+12 mois)</span><span>Taille : ${$("f-taille").value === "services" ? "nombre de services" : "nombre de partenariats"}</span>`;
+}
+
+function voisins(s) {
+  const v = new Set([s]); liens.forEach(l => { if (l.source === s) v.add(l.target); if (l.target === s) v.add(l.source); }); return v;
+}
+const elBulle = $("bulle");
+function bulle(e) { elBulle.style.left = e.clientX + 12 + "px"; elBulle.style.top = e.clientY + 12 + "px"; }
+function survol(s, e) {
+  elBulle.hidden = !s;
+  if (s) { elBulle.textContent = `${s.nom} — ${s.commune}`; bulle(e); }
+  const v = s && voisins(s);
+  gNoeuds.selectAll(".noeud").classed("estompe", n => v && !v.has(n));
+  gLiens.selectAll("line").classed("estompe", l => s && l.source !== s && l.target !== s);
+}
+
+function clic(s) {
+  if (modeChemin) {
+    chemin = chemin.length >= 2 ? [s] : [...chemin, s];
+    cheminDessin(); return;
+  }
+  selection = s; fiche(s);
+  const W = $("graphe").clientWidth, H = $("graphe").clientHeight;
+  svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(1.6).translate(-s.x, -s.y));
+}
+
+function fiche(s) {
+  const parts = PART.filter(l => l.source === s || l.target === s);
+  const proches = thematiques(S.filter(x => x === s || x.bassin === s.bassin), "").filter(l => l.source === s || l.target === s)
+    .map(l => l.source === s ? l.target : l.source).slice(0, 8);
+  const btn = x => `<button class="lienfiche" data-id="${esc(x.id)}">${esc(x.nom)}</button>`;
+  const corps = encodeURIComponent(`Structure : ${s.nom} (${s.siret || s.id})\nOriente vers (nom de la structure partenaire) : \nPour quel besoin : \nContact du référent : `);
+  $("panneau").innerHTML = `
+    <h2>${esc(s.nom)}</h2>
+    <div><span class="badge">${esc(lib(TYPES, type(s)))}</span><span class="badge">${esc(s.bassin)}</span>
+      <span class="badge ${vieux(s) ? "vieux" : ""}">${vieux(s) ? "À vérifier — " : ""}mise à jour le ${dateFr(s.maj)}</span></div>
+    ${s.description ? `<p>${esc(s.description)}</p>` : ""}
+    <h3>Ce qu'elle fait (${s.services.length} service${s.services.length > 1 ? "s" : ""})</h3>
+    ${s.services.map(v => `<div class="service"><strong>${esc(v.nom)}</strong>
+      ${v.description ? `<div class="info">${esc(v.description)}${v.description.length >= 400 ? "…" : ""}</div>` : ""}
+      ${v.publics.length ? `<div>Pour qui : ${v.publics.map(p => esc(lib(PUBLICS, p))).join(", ")}</div>` : ""}
+      ${v.conditions ? `<div>Conditions : ${esc(v.conditions)}</div>` : ""}
+      ${v.frais ? `<div>Coût : ${esc(lib(FRAIS, v.frais))}${v.frais_precisions ? " — " + esc(v.frais_precisions) : ""}</div>` : ""}
+      ${v.modes.length ? `<div>Modalités : ${v.modes.map(m => esc(m.replace(/-/g, " "))).join(", ")}</div>` : ""}</div>`).join("") || '<p class="info">Aucun service détaillé.</p>'}
+    <h3>Contact</h3>
+    ${s.tel ? `<div>📞 <a href="tel:${esc(s.tel)}">${esc(telAff(s.tel))}</a></div>` : ""}
+    ${s.mail ? `<div>✉️ <a href="mailto:${esc(s.mail)}">${esc(s.mail)}</a></div>` : ""}
+    ${s.web ? `<div>🌐 <a href="${esc(s.web)}" target="_blank" rel="noopener">${esc(s.web)}</a></div>` : ""}
+    <div>📍 ${esc([s.adresse, s.cp, s.commune].filter(Boolean).join(" "))}</div>
+    ${s.horaires ? `<div>🕒 ${esc(s.horaires)}</div>` : ""}
+    ${s.accessibilite ? `<div>♿ <a href="${esc(s.accessibilite)}" target="_blank" rel="noopener">Accessibilité du lieu</a></div>` : ""}
+    <h3>Partenaires déclarés</h3>
+    ${parts.length ? parts.map(l => `<div>${l.source === s ? "→ oriente vers " : "← reçoit de "}${btn(l.source === s ? l.target : l.source)} (${esc(lib(Object.fromEntries(Object.entries(BESOINS).map(([k, v]) => [k, v[1]])), l.besoin))})</div>`).join("")
+      : '<p class="info">Aucun partenariat déclaré pour l\'instant.</p>'}
+    <h3>Structures complémentaires (même bassin, besoins et publics communs)</h3>
+    ${proches.map(x => `<div>${btn(x)}</div>`).join("") || '<p class="info">Aucune.</p>'}
+    <h3>Mettre à jour</h3>
+    <p class="info">Les informations viennent de data·inclusion. La structure les corrige à la source :</p>
+    ${s.liens_source.filter(Boolean).map((u, i) => `<div><a href="${esc(u)}" target="_blank" rel="noopener">Modifier sur ${esc(s.sources[i])}</a></div>`).join("")}
+    <div class="actions"><a class="sec" href="mailto:${CONTACT_ANIMATEUR}?subject=${encodeURIComponent("Déclarer un partenariat")}&body=${corps}">Déclarer un partenariat</a></div>`;
+}
+$("panneau").onclick = e => { const b = e.target.closest(".lienfiche"); if (b) clic(parId.get(b.dataset.id)); };
+
+// Mode chemin : plus court chemin d'orientation (partenariats + liens thématiques) entre deux structures
+let graphe = null;
+function plusCourt(a, b) {
+  if (!graphe) {
+    graphe = new Map(S.map(s => [s, []]));
+    [...PART, ...thematiques(S, "")].forEach(l => { graphe.get(l.source).push(l.target); graphe.get(l.target).push(l.source); });
+  }
+  const prec = new Map([[a, null]]), file = [a];
+  while (file.length) {
+    const n = file.shift();
+    if (n === b) { const p = []; for (let x = b; x; x = prec.get(x)) p.unshift(x); return p; }
+    graphe.get(n).forEach(v => { if (!prec.has(v)) { prec.set(v, n); file.push(v); } });
+  }
+  return null;
+}
+function cheminDessin() {
+  let p = chemin.length === 2 ? plusCourt(...chemin) : null;
+  const seg = p ? p.slice(1).map((x, i) => ({ source: p[i], target: x, kind: "chemin" })) : [];
+  gChemin.selectAll("line").data(seg).join("line").attr("stroke", "#f2a900").attr("stroke-width", 6).attr("stroke-linecap", "round");
+  gChemin.selectAll("line").each(function (l) { bout(d3.select(this), l); });
+  if (!modeChemin) return;
+  gNoeuds.selectAll(".noeud").classed("estompe", n => p && !p.includes(n));
+  $("panneau").innerHTML = `<h2>Mode chemin</h2>` + (chemin.length < 2
+    ? `<p>Cliquez sur ${chemin.length ? "la structure d'arrivée" : "deux structures"} dans le nuage.</p>${chemin.length ? `<p>Départ : <strong>${esc(chemin[0].nom)}</strong></p>` : ""}`
+    : p ? `<ol>${p.map(x => `<li><button class="lienfiche" data-id="${esc(x.id)}">${esc(x.nom)}</button> <span class="info">(${esc(x.commune)})</span></li>`).join("")}</ol>
+        <p class="info">Chemin calculé sur les partenariats et les liens thématiques. Les structures du chemin peuvent être hors des filtres actifs.</p>`
+    : `<p>Aucun chemin entre <strong>${esc(chemin[0].nom)}</strong> et <strong>${esc(chemin[1].nom)}</strong>.</p>`);
+}
+$("bt-chemin").onclick = () => {
+  modeChemin = !modeChemin; chemin = []; $("bt-chemin").setAttribute("aria-pressed", modeChemin);
+  gNoeuds.selectAll(".noeud").classed("estompe", false); cheminDessin();
+  if (!modeChemin) $("panneau").innerHTML = '<p class="info">Cliquez sur un point pour ouvrir la fiche.</p>';
+};
+
+// Vue liste : toute l'information du nuage, sans le nuage
+function tableau(q) {
+  $("vue-liste").innerHTML = `<table><thead><tr><th>Structure</th><th>Type</th><th>Commune</th><th>Besoins</th><th>Mise à jour</th></tr></thead><tbody>`
+    + visibles.slice().sort((a, b) => (correspond(b, q) - correspond(a, q)) || a.nom.localeCompare(b.nom)).map(s => `<tr>
+      <td><button class="lienfiche" data-id="${esc(s.id)}">${esc(s.nom)}</button>${correspond(s, q) ? " ★" : ""}</td><td>${esc(lib(TYPES, type(s)))}</td>
+      <td>${esc(s.commune)}<br><span class="info">${esc(s.bassin)}</span></td><td>${s.besoins.map(b => BESOINS[b][0]).join(" ")}</td>
+      <td>${vieux(s) ? '<span class="badge vieux">à vérifier</span>' : ""}${dateFr(s.maj)}</td></tr>`).join("") + "</tbody></table>";
+}
+$("vue-liste").onclick = e => { const b = e.target.closest(".lienfiche"); if (b) { selection = parId.get(b.dataset.id); fiche(selection); } };
+function vue(liste) {
+  $("bt-vue").setAttribute("aria-pressed", liste); $("bt-vue").textContent = liste ? "Vue nuage" : "Vue liste";
+  $("graphe").hidden = liste; $("vue-liste").hidden = !liste;
+  if (!liste) dessiner();
+}
+$("bt-vue").onclick = () => vue($("bt-vue").getAttribute("aria-pressed") !== "true");
+
+["f-besoin", "f-public", "f-bassin", "f-type", "f-lien", "f-couleur", "f-taille"].forEach(id => $(id).onchange = dessiner);
+$("recherche").oninput = dessiner;
+$("bt-reset").onclick = () => {
+  document.querySelectorAll(".outils select").forEach(s => s.selectedIndex = 0); $("recherche").value = "";
+  if (modeChemin) $("bt-chemin").click();
+  svg.transition().call(zoom.transform, d3.zoomIdentity); dessiner();
+};
+if (matchMedia("(max-width: 800px)").matches) vue(true); // sur téléphone, la liste d'abord
+</script>
+</body>
+</html>
