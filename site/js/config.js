@@ -2,7 +2,7 @@
 var CONFIG = {
   // Adresse de l'animateur du réseau : elle reçoit les propositions de modification, les signalements et les
   // partenariats. Tant qu'elle est vide, les boutons de contribution sont masqués (aucune fausse adresse).
-  CONTACT_ANIMATEUR: "",
+  CONTACT_ANIMATEUR: "pierrick.frottier.pro@gmail.com",
 
   // Ordre des résultats du mode « J'ai besoin d'aide » : points ajoutés pour chaque critère.
   // Le score sert seulement à trier ; il n'est jamais affiché comme une note.
