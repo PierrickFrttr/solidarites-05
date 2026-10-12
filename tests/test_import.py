@@ -88,6 +88,16 @@ class Structures(unittest.TestCase):
         self.assertEqual(S["111"]["sources"], ["dora", "finess"])
         self.assertEqual(S["111"]["fraicheur"], "recent")
 
+    def test_un_siret_plusieurs_lieux(self):
+        mds = [dict(structure(f"m{i}", nom=f"Maison des Solidarités {v}", siret="220"), adresse=f"{i} rue {v}")
+               for i, v in enumerate(["Laragne", "Veynes"])]
+        meme_nom = dict(structure("m9", nom="Maison des Solidarités Veynes", siret="220", source="finess"), adresse="1, Rue Veynes bis")
+        S, err, _ = imp.construire(mds + [meme_nom], [], [], AUJ)
+        self.assertEqual(len(S), 2)  # deux lieux ; la 3e ligne (même nom) rejoint Veynes
+        self.assertTrue(all(k.startswith("220-") for k in S))
+        ids = imp.identifiants(mds + [meme_nom])
+        self.assertEqual(ids, imp.identifiants(list(reversed(mds + [meme_nom]))))  # stable, quel que soit l'ordre
+
     def test_sans_nom(self):
         _, err, _ = imp.construire([structure("a", nom=" ")], [], [], AUJ)
         self.assertIn("sans nom", err[0])

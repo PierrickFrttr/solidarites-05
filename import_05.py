@@ -6,7 +6,7 @@ Usage : python import_05.py            (télécharge la dernière version sur da
 Si un contrôle échoue, le script s'arrête avec un message clair et site/data.js n'est PAS modifié.
 Pour accepter une baisse légitime : IGNORER_CONTROLES=structures,services python import_05.py (ou « tout »).
 """
-import ast, csv, io, json, math, os, re, sys, unicodedata, urllib.request
+import ast, csv, hashlib, io, json, math, os, re, sys, unicodedata, urllib.request
 from collections import Counter
 from datetime import date
 from pathlib import Path
@@ -112,6 +112,36 @@ def liste(s):
     return ast.literal_eval(s) if s else []
 
 
+def lieu(r):
+    return simple(r["adresse"]) or simple(r["commune"])
+
+
+def identifiants(lignes):
+    """Une fiche par lieu : identifiant de chaque ligne source (par son id data·inclusion).
+    Deux lignes de même SIRET sont la même structure si elles ont la même adresse ou le même nom
+    (une structure présente dans plusieurs sources). Un SIRET partagé par plusieurs lieux distincts
+    (ex. les Maisons des Solidarités du Département) donne une fiche par lieu, d'identifiant
+    « SIRET-empreinte », stable d'un import à l'autre. Un SIRET à un seul lieu garde le SIRET comme identifiant."""
+    par_siret = {}
+    for r in lignes:
+        if r["siret"]:
+            par_siret.setdefault(r["siret"], []).append(r)
+    ids = {r["id"]: r["id"] for r in lignes if not r["siret"]}
+    for siret, rs in par_siret.items():
+        groupes = []  # chaque groupe : (lieux, noms, lignes)
+        for r in rs:
+            lie = [g for g in groupes if lieu(r) in g[0] or simple(r["nom"]) in g[1]]
+            nouveau = ({lieu(r)}, {simple(r["nom"])}, [r])
+            for g in lie:
+                groupes.remove(g)
+                nouveau[0].update(g[0]); nouveau[1].update(g[1]); nouveau[2].extend(g[2])
+            groupes.append(nouveau)
+        for lieux, _, membres in groupes:
+            cle = siret if len(groupes) == 1 else f"{siret}-{hashlib.sha1(min(lieux).encode()).hexdigest()[:6]}"
+            ids.update({m["id"]: cle for m in membres})
+    return ids
+
+
 def construire(lignes_structures, lignes_services, lignes_associations, aujourdhui):
     """Assemble les structures du 05. Retourne (structures par id, erreurs, avertissements)."""
     structures, par_id, erreurs, avert = {}, {}, [], []
@@ -124,10 +154,10 @@ def construire(lignes_structures, lignes_services, lignes_associations, aujourdh
             s["lat"] = s["lon"] = None
         s["bassin"] = bassin((s["lat"], s["lon"]) if s["lat"] is not None else None)
 
-    for r in lignes_structures:
-        if not (r.get("code_insee") or "").startswith("05"):
-            continue
-        cle = r["siret"] or r["id"]  # même SIRET = même établissement, présent dans plusieurs sources
+    lignes_05 = [r for r in lignes_structures if (r.get("code_insee") or "").startswith("05")]
+    ids = identifiants(lignes_05)
+    for r in lignes_05:
+        cle = ids[r["id"]]
         if not cle:
             erreurs.append(f"structure sans identifiant : {r.get('nom')!r}")
             continue
@@ -186,7 +216,7 @@ def construire(lignes_structures, lignes_services, lignes_associations, aujourdh
         if a["retenir"].strip().lower() != "oui":
             continue
         # ponytail: rapprochement par nom (« CIDFF 05 » dans « CIDFF 05 CENTRE D'INFORMATION… »), à affiner si faux positifs
-        doublon = (a["siret"] in structures and a["siret"]) or next((v for k, v in noms.items() if k in simple(a["nom"])), None)
+        doublon = next((s["nom"] for s in structures.values() if a["siret"] and s["siret"] == a["siret"]), None) or next((v for k, v in noms.items() if k in simple(a["nom"])), None)
         if doublon:
             avert.append(f"association {a['nom']} ignorée : déjà sur le site ({doublon})")
             continue
