@@ -139,6 +139,34 @@ class Partenariats(unittest.TestCase):
         self.assertIn("doublon", err[0])
 
 
+class LiensInstitutionnels(unittest.TestCase):
+    S = [{"id": "ft-gap", "nom": "Agence France Travail Gap", "reseaux": ["france-travail"], "lat": 44.56, "lon": 6.08},
+         {"id": "ft-bri", "nom": "Agence France Travail Briançon", "reseaux": ["france-travail"], "lat": 44.90, "lon": 6.64},
+         {"id": "ft-dt", "nom": "France Travail DT 05", "reseaux": ["france-travail"], "lat": 44.55, "lon": 5.80},
+         {"id": "aci-laragne", "nom": "Chantier Laragne", "reseaux": ["aci"], "lat": 44.32, "lon": 5.82},
+         {"id": "aci-bri", "nom": "Chantier Briançon", "reseaux": ["aci"], "lat": 44.89, "lon": 6.63},
+         {"id": "ml", "nom": "Mission locale", "reseaux": ["mission-locale"], "lat": 44.56, "lon": 6.08}]
+
+    def regle(self, de="france-travail", perimetre="plus_proche", besoin="emploi", exclure=r"\bDT\b"):
+        return {"de_reseau": de, "vers_reseau": "aci", "perimetre": perimetre, "besoin": besoin, "motif": "IAE", "exclure": exclure}
+
+    def test_plus_proche_et_exclusion(self):
+        liens, err, _ = imp.liens_institutionnels(self.S, [self.regle()])
+        # La DT (plus proche de Laragne) est exclue : Laragne dépend de l'agence de Gap.
+        self.assertEqual((err, {(l["de"], l["vers"]) for l in liens}), ([], {("ft-gap", "aci-laragne"), ("ft-bri", "aci-bri")}))
+
+    def test_departement_et_doublons(self):
+        liens, _, _ = imp.liens_institutionnels(self.S, [self.regle("mission-locale", "departement")] * 2)
+        self.assertEqual(len(liens), 2)
+
+    def test_erreurs_et_regle_sans_effet(self):
+        _, err, _ = imp.liens_institutionnels(self.S, [self.regle(perimetre="region"), self.regle(besoin="cuisine")])
+        self.assertEqual(len(err), 2)
+        _, err, avert = imp.liens_institutionnels(self.S, [self.regle(de="spip")])
+        self.assertEqual(err, [])
+        self.assertIn("sans effet", avert[0])
+
+
 class Regression(unittest.TestCase):
     def stats(self, n=100, services=200, gap=50):
         return {"structures": n, "services": services, "geolocalisees": n, "partenariats": 0,

@@ -65,7 +65,7 @@
       <label>Public <select id="f-public"></select></label>
       <label>Territoire <select id="f-bassin"></select></label>
       <label>Type <select id="f-type"></select></label>
-      <label>Liens <select id="f-lien"><option value="">Tous</option><option value="part">Partenariats seulement</option><option value="theme">Proximité thématique seulement</option></select></label>
+      <label>Liens <select id="f-lien"><option value="">Tous</option><option value="part">Partenariats seulement</option><option value="inst">Orientations réglementaires seulement</option><option value="theme">Proximité thématique seulement</option></select></label>
       <label>Couleur <select id="f-couleur"><option value="type">Type de structure</option><option value="besoin">Besoin principal</option></select></label>
       <label>Taille <select id="f-taille"><option value="services">Nombre de services</option><option value="part">Nombre de partenariats</option></select></label>
       <button id="bt-chemin" aria-pressed="false">Mode chemin</button>
@@ -85,7 +85,8 @@
         <p class="info">Choisissez une structure dans le nuage ou dans la vue liste pour ouvrir sa fiche.</p>
         <p class="info">Deux sortes de liens, à ne pas confondre :<br>
           — <strong>trait fin gris</strong> : proximité thématique, calculée (même bassin, un besoin en commun, publics compatibles). Visible quand un besoin est choisi ;<br>
-          — <strong>trait épais orange avec flèche</strong> : partenariat déclaré et validé (« oriente vers »).</p>
+          — <strong>trait épais orange avec flèche</strong> : partenariat déclaré et validé (« oriente vers ») ;<br>
+          — <strong>pointillés violets avec flèche</strong> : orientation prévue par la réglementation (calculée d'après le réseau de chaque structure).</p>
         <p class="info">Point gris : fiche non mise à jour depuis plus de 12 mois.</p>
       </aside>
     </div>

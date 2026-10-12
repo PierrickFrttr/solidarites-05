@@ -34,7 +34,9 @@ Dépendance externe unique : **D3 7.8.5**, chargé depuis cdnjs avec une version
 - **Fraîcheur** : `recent` (< 6 mois), `a_verifier` (6 à 12 mois), `ancien` (> 12 mois), `inconnue` (pas de date dans la source, aucune date n'est inventée).
 - **Partenariats** (`partenariats.csv`) : colonnes `de`, `vers` (SIRET ou identifiant de la structure), `besoin` (facultatif, un des besoins), `statut` (`valide`, `en_attente`, `refuse`), `date`. Seuls les `valide` sont publiés. Structure inconnue, auto-partenariat, doublon ou statut inconnu font échouer l'import. Ne jamais y mettre de coordonnées personnelles : le dépôt est public.
 
-Deux sortes de liens, à ne pas confondre : la **proximité thématique** (calculée : même bassin, un besoin en commun, publics compatibles) et le **partenariat** (déclaré et validé).
+- **Orientations réglementaires** (`regles_orientation.csv`) : liens calculés à partir du réseau de chaque structure dans data·inclusion (`reseaux_porteurs`). Une ligne = « les structures du réseau `de_reseau` peuvent orienter vers celles du réseau `vers_reseau` », avec un `perimetre` (`departement` : vers toutes ; `plus_proche` : chaque cible est reliée à la source la plus proche, par exemple l'agence France Travail de son secteur), un `besoin`, un `motif` affiché sur le site, un filtre `exclure` (expression sur le nom, pour écarter par exemple les directions territoriales) et une `reference`. **Ces règles doivent être validées par un référent métier** (colonne `reference`).
+
+Trois sortes de liens, à ne pas confondre : la **proximité thématique** (calculée : même bassin, un besoin en commun, publics compatibles), l'**orientation réglementaire** (calculée d'après les règles ci-dessus : ce que la réglementation permet) et le **partenariat** (déclaré et validé par les structures).
 
 ## Contrôles avant publication
 
@@ -80,6 +82,7 @@ Aucune dépendance à installer (bibliothèque standard Python, Node pour les te
 | Seuils de baisse tolérée | `import_05.py` → `SEUILS`, `EFFECTIF_MIN` |
 | Bassins de vie | `import_05.py` → `BASSINS` |
 | Rattachement des catégories data·inclusion aux besoins | `import_05.py` → `CATEGORIES_DI`, `SOUS_THEMATIQUES_DI`, `PUBLICS_BESOIN` |
+| Règles d'orientation réglementaire | `regles_orientation.csv` |
 | Seuils de fraîcheur | `import_05.py` → `FRAICHEUR_JOURS` |
 | Emprise géographique (coordonnées aberrantes) | `import_05.py` → `EMPRISE_05` |
 | Libellés et pictos des besoins, types, publics | `site/js/config.js` |

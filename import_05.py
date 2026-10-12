@@ -52,9 +52,12 @@ EMPRISE_05 = {"lat": (44.0, 45.3), "lon": (5.3, 7.2)}
 FRAICHEUR_JOURS = {"recent": 183, "a_verifier": 365}  # < 6 mois : récent, 6-12 mois : à vérifier, > 12 mois : ancien
 
 STATUTS_PARTENARIAT = {"valide", "en_attente", "refuse"}
+# Liens institutionnels : règles « tel réseau peut orienter vers tel réseau » (regles_orientation.csv).
+PERIMETRES = {"departement", "plus_proche"}  # vers toutes les structures cibles du 05, ou depuis la source la plus proche
 
 # Contrôle de régression : baisse maximale tolérée par rapport aux données déjà publiées.
-SEUILS = {"structures": 0.30, "services": 0.30, "geolocalisees": 0.30, "partenariats": 0.50, "bassin": 0.50, "besoin": 0.50}
+SEUILS = {"structures": 0.30, "services": 0.30, "geolocalisees": 0.30, "partenariats": 0.50, "institutionnels": 0.50,
+          "bassin": 0.50, "besoin": 0.50}
 EFFECTIF_MIN = 5  # un bassin ou un besoin plus petit que ça n'est pas contrôlé (trop de bruit)
 
 # ================================================================================================
@@ -137,6 +140,7 @@ def construire(lignes_structures, lignes_services, lignes_associations, aujourdh
                 "adresse": r["adresse"], "tel": r["telephone"], "mail": r["courriel"], "web": r["site_web"],
                 "description": r["description"], "horaires": r["horaires_accueil"], "accessibilite": r["accessibilite_lieu"],
                 "maj": r["date_maj"], "sources": [], "liens_source": [], "services": [], "besoins": set(), "publics": set(),
+                "reseaux": set(),
             }
             placer(s, r["latitude"], r["longitude"])
         s = structures[cle]
@@ -144,6 +148,7 @@ def construire(lignes_structures, lignes_services, lignes_associations, aujourdh
             s["sources"].append(r["source"])
             s["liens_source"].append(r["lien_source"])
         s["maj"] = max(s["maj"], r["date_maj"])
+        s["reseaux"] |= set(liste(r.get("reseaux_porteurs", "")))
         for champ, col in [("tel", "telephone"), ("mail", "courriel"), ("web", "site_web"), ("description", "description")]:
             s[champ] = s[champ] or r[col]
         par_id[r["id"]] = s
@@ -194,13 +199,14 @@ def construire(lignes_structures, lignes_services, lignes_associations, aujourdh
             "id": cle, "nom": a["nom"].strip(), "siret": a["siret"], "commune": a["commune"], "cp": "", "adresse": "",
             "tel": a["tel"], "mail": a["mail"], "web": a["web"], "description": a["objet"], "horaires": "",
             "accessibilite": "", "maj": a["maj"], "sources": ["rna"], "liens_source": [""], "besoins": b, "publics": set(),
+            "reseaux": set(),
             "services": [{"nom": "Objet de l'association", "description": a["objet"][:400], "thematiques": [], "publics": [],
                           "conditions": "", "frais": "", "frais_precisions": "", "modes": [], "besoins": sorted(b)}],
         }
         placer(s, a["lat"], a["lon"])
 
     for s in structures.values():
-        s["besoins"], s["publics"] = sorted(s["besoins"]), sorted(s["publics"])
+        s["besoins"], s["publics"], s["reseaux"] = sorted(s["besoins"]), sorted(s["publics"]), sorted(s["reseaux"])
         s["fraicheur"] = fraicheur(s["maj"], aujourdhui)
     avert += doublons_probables(structures.values())
     return structures, erreurs, avert
@@ -241,11 +247,45 @@ def partenariats(lignes, ids):
     return publies, erreurs
 
 
+def liens_institutionnels(structures, regles):
+    """Applique regles_orientation.csv. Retourne (liens, erreurs, avertissements)."""
+    S, liens, vus, erreurs, avert = list(structures), [], set(), [], []
+    for n, r in enumerate(regles, start=2):
+        ou = f"regles_orientation.csv ligne {n}"
+        if r["perimetre"] not in PERIMETRES:
+            erreurs.append(f"{ou} : périmètre {r['perimetre']!r} inconnu, valeurs possibles : {sorted(PERIMETRES)}")
+            continue
+        if r["besoin"] and r["besoin"] not in BESOINS:
+            erreurs.append(f"{ou} : besoin {r['besoin']!r} inconnu, valeurs possibles : {BESOINS}")
+            continue
+        exclure = (r.get("exclure") or "").strip()
+        sources = [s for s in S if r["de_reseau"] in s["reseaux"] and not (exclure and re.search(exclure, s["nom"], re.I))]
+        cibles = [s for s in S if r["vers_reseau"] in s["reseaux"]]
+        if not sources or not cibles:
+            avert.append(f"{ou} sans effet : aucune structure du réseau {r['de_reseau'] if not sources else r['vers_reseau']}")
+            continue
+        for c in cibles:
+            if r["perimetre"] == "plus_proche":
+                placees = [s for s in sources if s["lat"] is not None]
+                if c["lat"] is None or not placees:
+                    avert.append(f"{ou} : {c['nom']} sans position, pas de « {r['de_reseau']} » le plus proche")
+                    continue
+                choix = [min(placees, key=lambda s: math.dist((s["lat"], s["lon"]), (c["lat"], c["lon"])))]
+            else:
+                choix = sources
+            for s in choix:
+                if s["id"] != c["id"] and (s["id"], c["id"]) not in vus:
+                    vus.add((s["id"], c["id"]))
+                    liens.append({"de": s["id"], "vers": c["id"], "besoin": r["besoin"], "motif": r["motif"]})
+    return liens, erreurs, avert
+
+
 def statistiques(data):
     S = data["structures"]
     return {
         "structures": len(S), "services": sum(len(s["services"]) for s in S),
         "geolocalisees": sum(1 for s in S if s.get("lat") is not None), "partenariats": len(data["partenariats"]),
+        "institutionnels": len(data.get("institutionnels", [])),
         "bassin": dict(Counter(s["bassin"] for s in S)), "besoin": dict(Counter(b for s in S for b in s["besoins"])),
         "fraicheur": dict(Counter(s.get("fraicheur", "inconnue") for s in S)),
     }
@@ -256,8 +296,8 @@ def anomalies(avant, apres, seuils=SEUILS, ignorer=()):
     out = []
     if apres["structures"] == 0:
         return ["aucune structure dans les nouvelles données"]
-    for cle in ("structures", "services", "geolocalisees", "partenariats"):
-        a, b = avant.get(cle, 0), apres[cle]
+    for cle in ("structures", "services", "geolocalisees", "partenariats", "institutionnels"):
+        a, b = avant.get(cle, 0), apres.get(cle, 0)
         if cle not in ignorer and a > 0 and (a - b) / a > seuils[cle]:
             out.append(f"{cle} : {a} -> {b} (-{(a - b) / a:.0%}, seuil {seuils[cle]:.0%})")
     for cle in ("bassin", "besoin"):
@@ -281,6 +321,7 @@ def lire_data(chemin):
 def rapport(stats):
     lignes = [f"Structures : {stats['structures']} (géolocalisées : {stats['geolocalisees']})",
               f"Services : {stats['services']}", f"Partenariats publiés : {stats['partenariats']}",
+              f"Liens institutionnels : {stats['institutionnels']}",
               "Bassins : " + ", ".join(f"{k} {v}" for k, v in sorted(stats["bassin"].items())),
               "Besoins : " + ", ".join(f"{k} {stats['besoin'].get(k, 0)}" for k in BESOINS),
               "Fraîcheur : " + ", ".join(f"{k} {v}" for k, v in sorted(stats["fraicheur"].items()))]
@@ -308,9 +349,12 @@ def main(dossier=None):
         lire_csv("associations.csv", encoding="utf-8-sig", delimiter=";"), aujourdhui)
     publies, err_part = partenariats(lire_csv("partenariats.csv"), set(structures))
     erreurs += err_part
+    institutionnels, err_inst, avert_inst = liens_institutionnels(structures.values(), lire_csv("regles_orientation.csv"))
+    erreurs += err_inst
+    avert += avert_inst
 
     data = {"genere_le": aujourdhui.isoformat(), "fraicheur_jours": FRAICHEUR_JOURS,
-            "structures": list(structures.values()), "partenariats": publies}
+            "structures": list(structures.values()), "partenariats": publies, "institutionnels": institutionnels}
     stats = statistiques(data)
     print(rapport(stats))
     for a in avert:

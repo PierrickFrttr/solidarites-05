@@ -1,0 +1,14 @@
+de_reseau,vers_reseau,perimetre,besoin,motif,exclure,reference
+france-travail,aci,plus_proche,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),\bDT\b|direction,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+france-travail,ei,plus_proche,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),\bDT\b|direction,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+france-travail,etti,plus_proche,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),\bDT\b|direction,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+mission-locale,aci,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+mission-locale,ei,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+mission-locale,etti,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+cap-emploi-reseau-cheops,aci,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+cap-emploi-reseau-cheops,ei,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+cap-emploi-reseau-cheops,etti,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+spip,aci,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+spip,ei,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+spip,etti,departement,emploi,Prescripteur habilité de l'insertion par l'activité économique (IAE),,Liste des prescripteurs habilités IAE (Plateforme de l'inclusion) — À FAIRE VALIDER
+mdph,esat,departement,handicap,Orientation en ESAT décidée par la CDAPH (MDPH),,"Code de l'action sociale et des familles, art. L241-6 — À FAIRE VALIDER"

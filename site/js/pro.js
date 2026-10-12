@@ -2,7 +2,12 @@
 const parId = new Map(S.map(s => [s.id, s]));
 const PART = PART_BRUTS.map(p => ({ source: parId.get(p.de), target: parId.get(p.vers), kind: "part", besoin: p.besoin }))
   .filter(l => l.source && l.target);
+// Liens institutionnels : orientations prévues par la réglementation (regles_orientation.csv), calculés à l'import
+const INST = (DONNEES_OK && DATA.institutionnels || []).map(p => ({ source: parId.get(p.de), target: parId.get(p.vers), kind: "inst", besoin: p.besoin, motif: p.motif }))
+  .filter(l => l.source && l.target);
 const partenariatsDe = s => PART.filter(l => l.source === s || l.target === s);
+const institutionnelsDe = s => INST.filter(l => l.source === s || l.target === s);
+const COULEUR_LIEN = { part: "#c2410c", inst: "#6d28d9" };
 const libBesoin = b => (BESOINS[b] || [, b])[1];
 const D3_OK = typeof d3 !== "undefined";
 const DUREE = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 600;
@@ -70,30 +75,35 @@ function correspondFiltres(s) {
     && (!filtre("f-bassin") || s.bassin === filtre("f-bassin")) && (!filtre("f-type") || typeDe(s) === filtre("f-type"));
 }
 function reseau(s) {
-  const partenaires = [...new Set(partenariatsDe(s).map(l => l.source === s ? l.target : l.source))];
-  const proches = S.filter(x => !partenaires.includes(x) && enCommun(s, x).length);
-  const bassin = S.filter(x => x !== s && x.bassin === s.bassin && !partenaires.includes(x) && !proches.includes(x));
-  return { partenaires, proches, bassin };
+  const autre = l => l.source === s ? l.target : l.source;
+  const partenaires = [...new Set(partenariatsDe(s).map(autre))];
+  const institutionnels = [...new Set(institutionnelsDe(s).map(autre))].filter(x => !partenaires.includes(x));
+  const relies = [...partenaires, ...institutionnels];
+  const proches = S.filter(x => !relies.includes(x) && enCommun(s, x).length);
+  const bassin = S.filter(x => x !== s && x.bassin === s.bassin && !relies.includes(x) && !proches.includes(x));
+  return { partenaires, institutionnels, proches, bassin };
 }
 function calculer() {
   const b = filtre("f-besoin"), fl = filtre("f-lien");
   if (reseauDe) {
     const r = reseau(reseauDe);
-    visibles = [reseauDe, ...[...r.partenaires, ...r.proches, ...(inclureBassin ? r.bassin : [])].filter(correspondFiltres)];
+    visibles = [reseauDe, ...[...r.partenaires, ...r.institutionnels, ...r.proches, ...(inclureBassin ? r.bassin : [])].filter(correspondFiltres)];
   } else visibles = S.filter(correspondFiltres);
   const ids = new Set(visibles);
   const theme = reseauDe // en mode réseau : uniquement les liens de la structure choisie (étoile lisible)
     ? visibles.filter(x => enCommun(reseauDe, x, b).length).map(x => ({ source: reseauDe, target: x, kind: "theme", communs: enCommun(reseauDe, x, b) }))
     : b ? thematiques(visibles, b) : [];
-  liens = [...(fl !== "theme" ? PART.filter(l => ids.has(l.source) && ids.has(l.target)) : []), ...(fl !== "part" ? theme : [])];
+  const entre = L => L.filter(l => ids.has(l.source) && ids.has(l.target));
+  liens = [...(!fl || fl === "part" ? entre(PART) : []), ...(!fl || fl === "inst" ? entre(INST) : []), ...(!fl || fl === "theme" ? theme : [])];
 }
 const recherche = () => $("recherche").value.trim().toLowerCase();
 const correspond = (s, q) => !!q && (s.nom + " " + s.commune + " " + s.description + " " + s.services.map(v => v.nom + " " + v.description).join(" ")).toLowerCase().includes(q);
 
 function dessiner() {
   calculer();
-  const q = recherche(), nbPart = liens.filter(l => l.kind === "part").length, nbTheme = liens.length - nbPart;
-  $("compte").textContent = `${visibles.length} structure${visibles.length > 1 ? "s" : ""}, ${nbPart} partenariat${nbPart > 1 ? "s" : ""} validé${nbPart > 1 ? "s" : ""}, ${nbTheme} lien${nbTheme > 1 ? "s" : ""} de proximité thématique`
+  const q = recherche(), nb = k => liens.filter(l => l.kind === k).length, pl = n => n > 1 ? "s" : "";
+  $("compte").textContent = `${visibles.length} structure${pl(visibles.length)}, ${nb("part")} partenariat${pl(nb("part"))} validé${pl(nb("part"))}, `
+    + `${nb("inst")} orientation${pl(nb("inst"))} réglementaire${pl(nb("inst"))}, ${nb("theme")} lien${pl(nb("theme"))} de proximité thématique`
     + (q ? ` — ${visibles.filter(s => correspond(s, q)).length} correspondent à « ${q} »` : "")
     + (!D3_OK ? ". Le graphique n'a pas pu être chargé : la vue liste donne accès à toutes les informations." : "")
     + (!reseauDe && !filtre("f-besoin") && D3_OK ? ". Choisissez un besoin pour voir la proximité thématique." : "");
@@ -110,8 +120,9 @@ const rayon = s => 5 + 2.2 * Math.sqrt(filtre("f-taille") === "services" ? s.ser
 function initGraphe() {
   svg = d3.select("#graphe");
   const racine = svg.append("g");
-  svg.append("defs").append("marker").attr("id", "fleche").attr("viewBox", "0 -5 10 10").attr("refX", 10)
-    .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto").append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#c2410c");
+  const defs = svg.append("defs");
+  Object.entries(COULEUR_LIEN).forEach(([k, c]) => defs.append("marker").attr("id", "fleche-" + k).attr("viewBox", "0 -5 10 10").attr("refX", 10)
+    .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto").append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", c));
   zoom = d3.zoom().scaleExtent([.3, 6]).on("zoom", e => racine.attr("transform", e.transform));
   svg.call(zoom);
   gBassins = racine.append("g").attr("aria-hidden", "true");
@@ -127,7 +138,7 @@ function initGraphe() {
   });
 }
 function bout(sel, l) { // raccourcit le trait pour que la flèche touche le bord du point
-  const dx = l.target.x - l.source.x, dy = l.target.y - l.source.y, d = Math.hypot(dx, dy) || 1, r = l.kind === "part" ? rayon(l.target) + 2 : 0;
+  const dx = l.target.x - l.source.x, dy = l.target.y - l.source.y, d = Math.hypot(dx, dy) || 1, r = COULEUR_LIEN[l.kind] ? rayon(l.target) + 2 : 0;
   sel.attr("x1", l.source.x).attr("y1", l.source.y).attr("x2", l.target.x - dx / d * r).attr("y2", l.target.y - dy / d * r);
 }
 
@@ -141,10 +152,12 @@ function graphe(q) {
     .attr("text-anchor", "middle").attr("fill", "#9c9483").attr("font-size", 15).attr("font-weight", 700).text(d => d[0]);
 
   gLiens.selectAll("line").data(liens).join(enter => enter.append("line").call(l => l.append("title")))
-    .attr("stroke", l => l.kind === "part" ? "#c2410c" : "#8a959d").attr("stroke-opacity", l => l.kind === "part" ? .9 : .35)
-    .attr("stroke-width", l => l.kind === "part" ? 3 : 1).attr("marker-end", l => l.kind === "part" ? "url(#fleche)" : null)
+    .attr("stroke", l => COULEUR_LIEN[l.kind] || "#8a959d").attr("stroke-opacity", l => l.kind === "theme" ? .35 : .85)
+    .attr("stroke-width", l => ({ part: 3, inst: 2 })[l.kind] || 1).attr("stroke-dasharray", l => l.kind === "inst" ? "5 3" : null)
+    .attr("marker-end", l => COULEUR_LIEN[l.kind] ? `url(#fleche-${l.kind})` : null)
     .select("title").text(l => l.kind === "part"
       ? `Partenariat validé : ${l.source.nom} oriente vers ${l.target.nom}${l.besoin ? ` (${libBesoin(l.besoin)})` : ""}`
+      : l.kind === "inst" ? `Orientation prévue par la réglementation : ${l.source.nom} peut orienter vers ${l.target.nom} — ${l.motif}`
       : `Proximité thématique : ${l.communs.map(libBesoin).join(", ")}, même bassin`);
 
   gNoeuds.selectAll(".noeud").data(visibles, s => s.id).join(entree => {
@@ -164,7 +177,7 @@ function graphe(q) {
   const ancre = s => ancres.get(s.bassin) || [W / 2, H / 2];
   sim.nodes(visibles)
     .force("x", d3.forceX(s => ancre(s)[0]).strength(reseauDe ? .03 : .12)).force("y", d3.forceY(s => ancre(s)[1]).strength(reseauDe ? .03 : .12))
-    .force("lien", d3.forceLink(liens).strength(l => l.kind === "part" ? .3 : reseauDe ? .1 : .01))
+    .force("lien", d3.forceLink(liens).strength(l => l.kind === "part" ? .3 : l.kind === "inst" ? .05 : reseauDe ? .1 : .01))
     .force("collide", d3.forceCollide(s => rayon(s) + 2)).alpha(.8).restart();
   dessinerChemin();
 }
@@ -205,6 +218,7 @@ function legende() {
   $("legende").innerHTML = (D3_OK && !vueListe() ? entrees.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join("") : "")
     + '<span><i style="background:#a7adb2"></i>Fiche ancienne (plus de 12 mois)</span>'
     + '<span><i class="trait"></i>Proximité thématique (calculée)</span><span><i class="trait part"></i>Partenariat validé (oriente vers)</span>'
+    + '<span><i class="trait inst"></i>Orientation prévue par la réglementation</span>'
     + (D3_OK && !vueListe() ? `<span>Taille : ${filtre("f-taille") === "services" ? "nombre de services" : "nombre de partenariats"}</span>` : "");
 }
 
@@ -257,6 +271,10 @@ function fiche(s) {
     <h3>Partenariats déclarés et validés</h3>
     ${partenariatsDe(s).map(l => `<div>${l.source === s ? "→ oriente vers " : "← reçoit des personnes de "}${btn(l.source === s ? l.target : l.source)}${l.besoin ? ` (${esc(libBesoin(l.besoin))})` : ""}</div>`).join("")
       || '<p class="info">Aucun partenariat déclaré pour l\'instant.</p>'}
+    <h3>Orientations prévues par la réglementation (${institutionnelsDe(s).length})</h3>
+    ${institutionnelsDe(s).length ? '<p class="info">Calculées à partir du réseau de chaque structure. Elles décrivent ce que la réglementation permet, pas un partenariat déclaré.</p>'
+      + institutionnelsDe(s).map(l => `<div>${l.source === s ? "→ peut orienter vers " : "← peut recevoir des personnes orientées par "}${btn(l.source === s ? l.target : l.source)} <span class="info">— ${esc(l.motif)}</span></div>`).join("")
+      : '<p class="info">Aucune.</p>'}
     <h3>Proximité thématique (${r.proches.length})</h3>
     <p class="info">Même bassin, au moins un besoin en commun, publics compatibles. C'est une complémentarité possible, pas un partenariat.</p>
     ${r.proches.slice(0, 12).map(x => `<div>${btn(x)} <span class="info">— en commun : ${enCommun(s, x).map(libBesoin).join(", ")}</span></div>`).join("") || '<p class="info">Aucune.</p>'}
@@ -274,7 +292,7 @@ function voirReseau(s) {
   reseauDe = s;
   inclureBassin = false;
   const r = reseau(s);
-  $("bandeau-reseau").innerHTML = `<span>Réseau de <strong>${esc(s.nom)}</strong> : ${r.partenaires.length} partenariat(s) validé(s),
+  $("bandeau-reseau").innerHTML = `<span>Réseau de <strong>${esc(s.nom)}</strong> : ${r.partenaires.length} partenariat(s) validé(s), ${r.institutionnels.length} orientation(s) réglementaire(s),
     ${r.proches.length} structure(s) en proximité thématique, ${r.bassin.length} autre(s) structure(s) du bassin. Les filtres en cours s'appliquent.</span>
     <label><input type="checkbox" id="reseau-bassin"> Afficher aussi les autres structures du bassin</label>
     <button class="bouton" id="quitter-reseau">Revenir à toutes les structures</button>`;
@@ -294,7 +312,7 @@ let grapheChemins = null;
 function plusCourt(a, b) { // parcours en largeur sur les partenariats et la proximité thématique
   if (!grapheChemins) {
     grapheChemins = new Map(S.map(s => [s, []]));
-    [...PART, ...thematiques(S, "")].forEach(l => { grapheChemins.get(l.source).push(l.target); grapheChemins.get(l.target).push(l.source); });
+    [...PART, ...INST, ...thematiques(S, "")].forEach(l => { grapheChemins.get(l.source).push(l.target); grapheChemins.get(l.target).push(l.source); });
   }
   const prec = new Map([[a, null]]), file = [a];
   while (file.length) {
@@ -314,8 +332,8 @@ function dessinerChemin() {
   $("panneau").innerHTML = `<h2 id="fiche-titre" tabindex="-1">Mode chemin</h2>` + (chemin.length < 2
     ? `<p>Choisissez ${chemin.length ? "la structure d'arrivée" : "deux structures"} dans le nuage.</p>${chemin.length ? `<p>Départ : <strong>${esc(chemin[0].nom)}</strong></p>` : ""}`
     : p ? `<ol>${p.map(x => `<li><button class="lienfiche" data-id="${esc(x.id)}">${esc(x.nom)}</button> <span class="info">(${esc(x.commune)})</span></li>`).join("")}</ol>
-        <p class="info">Chemin calculé sur les partenariats validés et la proximité thématique (qui ne relie que des structures d'un même bassin).</p>`
-    : `<p>Aucun chemin entre <strong>${esc(chemin[0].nom)}</strong> et <strong>${esc(chemin[1].nom)}</strong> : elles ne sont reliées ni par des partenariats, ni par la proximité thématique.</p>`);
+        <p class="info">Chemin calculé sur les partenariats validés, les orientations réglementaires et la proximité thématique (qui ne relie que des structures d'un même bassin).</p>`
+    : `<p>Aucun chemin entre <strong>${esc(chemin[0].nom)}</strong> et <strong>${esc(chemin[1].nom)}</strong> : elles ne sont reliées ni par des partenariats, ni par des orientations réglementaires, ni par la proximité thématique.</p>`);
 }
 function basculerChemin() {
   modeChemin = !modeChemin;
@@ -332,14 +350,14 @@ function tableau(q) {
   $("vue-liste").innerHTML = `<div class="tableau"><table>
     <caption>${lignes.length} structures ${reseauDe ? `du réseau de ${esc(reseauDe.nom)}` : "correspondant aux filtres"}</caption>
     <thead><tr><th scope="col">Structure</th><th scope="col">Commune et bassin</th><th scope="col">Type</th><th scope="col">Besoins</th>
-      <th scope="col">Publics</th><th scope="col">Partenariats</th><th scope="col">Fraîcheur</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <th scope="col">Publics</th><th scope="col">Liens</th><th scope="col">Fraîcheur</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>${lignes.map(s => `<tr>
       <td><button class="lienfiche" data-id="${esc(s.id)}">${esc(s.nom)}</button>${correspond(s, q) ? ' <span aria-hidden="true">★</span><span class="sr-only">(correspond à la recherche)</span>' : ""}</td>
       <td>${esc(s.commune)}<br><span class="info">${esc(s.bassin)}</span></td>
       <td>${esc(lib(TYPES, typeDe(s)))}</td>
       <td>${s.besoins.map(libBesoin).join(", ") || "—"}</td>
       <td>${esc(publics(s))}</td>
-      <td>${partenariatsDe(s).length}</td>
+      <td>${partenariatsDe(s).length} partenariat(s)<br><span class="info">${institutionnelsDe(s).length} orientation(s) régl.</span></td>
       <td><span class="badge f-${s.fraicheur}">${esc(FRAICHEUR[s.fraicheur] || FRAICHEUR.inconnue)}</span>${s.maj ? `<br><span class="info">${dateFr(s.maj)}</span>` : ""}</td>
       <td><button class="bouton" data-reseau="${esc(s.id)}">Voir le réseau</button></td></tr>`).join("")}</tbody></table></div>`;
 }

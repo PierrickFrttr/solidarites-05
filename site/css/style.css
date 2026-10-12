@@ -69,6 +69,7 @@ footer{padding:16px;text-align:center;color:var(--doux);font-size:.9rem}
 .legende i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .legende .trait{width:22px;height:0;border-radius:0;border-top:1px solid #8a959d;vertical-align:4px}
 .legende .trait.part{border-top:3px solid #c2410c}
+.legende .trait.inst{border-top:2px dashed #6d28d9}
 .noeud{cursor:pointer}
 .noeud:focus{outline:none}
 .noeud:focus circle{stroke:#f2a900;stroke-width:4}
