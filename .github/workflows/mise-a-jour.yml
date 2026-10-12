@@ -3,6 +3,13 @@ on:
   schedule:
     - cron: "0 8 1 * *"  # le 1er du mois à 8 h UTC
   workflow_dispatch:      # bouton « Run workflow » pour lancer à la main
+    inputs:
+      ignorer_controles:
+        description: "Contrôles de baisse à ignorer si la baisse est normale (ex. structures,services ou tout)"
+        required: false
+        default: ""
+  push:                   # les tests tournent aussi à chaque modification du code (sans import)
+    paths: ["**.py", "site/js/**", "tests/**", ".github/workflows/**"]
 permissions:
   contents: write
 jobs:
@@ -13,10 +20,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python import_05.py
+      # Aucune dépendance à installer : le script n'utilise que la bibliothèque standard de Python.
+      - name: Tests
+        run: |
+          python -m unittest discover -s tests -v
+          node tests/test_utils.js
+      - name: Import et contrôles des données
+        if: github.event_name != 'push'
+        env:
+          IGNORER_CONTROLES: ${{ inputs.ignorer_controles }}
+        run: python import_05.py
       - name: Enregistrer les nouvelles données (Cloudflare republie le site)
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add site/data.js
-          git diff --cached --quiet || git commit -m "Données data·inclusion du $(date +%F)" && git push
+          if git diff --cached --quiet; then
+            echo "Aucune modification des données : rien à publier."
+          else
+            git commit -m "Données data·inclusion du $(date +%F)"
+            git push
+          fi

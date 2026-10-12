@@ -1,3 +1,5 @@
 mise_a_jour.log
 .wrangler/
 node_modules/
+site/data.tmp
+__pycache__/
