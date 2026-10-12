@@ -3,7 +3,7 @@
 Usage : python import_05.py            (télécharge la dernière version sur data.gouv.fr)
         python import_05.py DOSSIER    (utilise structures.csv et services.csv déjà téléchargés)
 """
-import ast, csv, io, json, math, sys, urllib.request
+import ast, csv, io, json, math, re, sys, unicodedata, urllib.request
 from pathlib import Path
 
 DATASET = "https://www.data.gouv.fr/api/1/datasets/6233723c2c1e4a54af2f6b2d/"
@@ -101,6 +101,29 @@ def main(dossier=None):
         s["publics"] |= set(pu)
         s["tel"] = s["tel"] or r["telephone"]
         s["mail"] = s["mail"] or r["courriel"]
+
+    # Associations du RNA retenues à la main dans associations.csv (voir associations_rna.py)
+    fichier = ICI / "associations.csv"
+    simple = lambda t: re.sub(r"[^a-z0-9]", "", unicodedata.normalize("NFKD", t.lower()))
+    noms = {simple(s["nom"]): s["nom"] for s in structures.values() if len(simple(s["nom"])) >= 6}
+    for a in csv.DictReader(open(fichier, encoding="utf-8-sig"), delimiter=";") if fichier.exists() else []:
+        if a["retenir"].strip().lower() != "oui":
+            continue
+        # ponytail: rapprochement par nom (« CIDFF 05 » dans « CIDFF 05 CENTRE D'INFORMATION… »), à affiner si faux positifs
+        doublon = (a["siret"] in structures and a["siret"]) or next((n for k, n in noms.items() if k in simple(a["nom"])), None)
+        if doublon:
+            print(f"Association {a['nom']} ignorée : déjà sur le site ({doublon})")
+            continue
+        b = set(a["besoins"].split()) & set(BESOINS)
+        structures[a["siret"] or a["rna"]] = {
+            "id": a["siret"] or a["rna"], "nom": a["nom"], "siret": a["siret"], "commune": a["commune"], "cp": "",
+            "adresse": "", "lat": float(a["lat"]) if a["lat"] else None, "lon": float(a["lon"]) if a["lon"] else None,
+            "tel": a["tel"], "mail": a["mail"], "web": a["web"], "description": a["objet"], "horaires": "",
+            "accessibilite": "", "maj": a["maj"], "sources": ["rna"], "liens_source": [""],
+            "bassin": bassin(a["lat"], a["lon"]), "besoins": b, "publics": set(),
+            "services": [{"nom": "Objet de l'association", "description": a["objet"][:400], "thematiques": [], "publics": [],
+                          "conditions": "", "frais": "", "frais_precisions": "", "modes": [], "besoins": sorted(b)}],
+        }
 
     for s in structures.values():
         s["besoins"], s["publics"] = sorted(s["besoins"]), sorted(s["publics"])
